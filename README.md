@@ -1,4 +1,4 @@
-# Unified MCP Platform
+# MCP Hub
 
 ## Project Description
 A unified chat interface that integrates **5 MCP (Model Context Protocol) servers** — GitHub, Zomato, Notion, Figma & HubSpot — into a single conversational AI platform powered by OpenAI. Users can seamlessly interact with multiple services from one place using natural language and slash commands, with per-server OAuth management, persistent chat history, and an intelligent multi-server task planner.
