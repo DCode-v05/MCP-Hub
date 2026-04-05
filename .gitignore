@@ -1,0 +1,57 @@
+# ── Python ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+*.whl
+
+# ── Virtual environments ────────────────────────────────────
+venv/
+.venv/
+env/
+.env
+
+# ── Backend secrets ─────────────────────────────────────────
+backend/.env
+backend/sessions.json
+*.env.local
+*.env.*.local
+
+# ── Node / Frontend ─────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# ── Vite temp files ─────────────────────────────────────────
+*.timestamp-*.mjs
+
+# ── IDE / Editor ────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── OS ──────────────────────────────────────────────────────
+.DS_Store
+Desktop.ini
+
+# ── Logs ────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ── MCP auth cache ──────────────────────────────────────────
+.mcp-auth/
+
+# ── Misc ────────────────────────────────────────────────────
+*.pkl
+*.pickle
+.cache/
