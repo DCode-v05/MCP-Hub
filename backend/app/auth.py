@@ -15,13 +15,8 @@ from app import storage, mcp_manager
 
 router = APIRouter()
 
-# Temporary in-memory PKCE verifier store keyed by OAuth state
 _hubspot_pkce_verifiers: dict[str, str] = {}
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-#  Notion OAuth
-# ═════════════════════════════════════════════════════════════════════════════
 
 @router.get("/auth/notion/login")
 async def notion_login():
@@ -75,7 +70,6 @@ async def notion_callback(code: str, state: str):
         if not access_token:
             raise HTTPException(status_code=400, detail="No access token received from Notion")
 
-        # Persist token and set it in MCP manager
         storage.save_token("notion", state, access_token)
         mcp_manager.set_token("notion", access_token)
 
@@ -88,10 +82,6 @@ async def notion_status():
     token = mcp_manager.get_token("notion")
     return {"connected": token is not None}
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-#  Figma OAuth
-# ═════════════════════════════════════════════════════════════════════════════
 
 @router.get("/auth/figma/login")
 async def figma_login():
@@ -140,7 +130,6 @@ async def figma_callback(code: str, state: str):
         if not access_token:
             raise HTTPException(status_code=400, detail="No access token received from Figma")
 
-        # Persist token and set it in MCP manager
         storage.save_token("figma", state, access_token)
         mcp_manager.set_token("figma", access_token)
 
@@ -153,10 +142,6 @@ async def figma_status():
     token = mcp_manager.get_token("figma")
     return {"connected": token is not None}
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-#  HubSpot OAuth
-# ═════════════════════════════════════════════════════════════════════════════
 
 @router.get("/auth/hubspot/login")
 async def hubspot_login():
@@ -236,10 +221,6 @@ async def hubspot_status():
     token = mcp_manager.get_token("hubspot")
     return {"connected": token is not None}
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-#  GitHub OAuth  (optional — only works when GITHUB_CLIENT_ID is set)
-# ═════════════════════════════════════════════════════════════════════════════
 
 @router.get("/auth/github/login")
 async def github_login():

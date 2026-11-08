@@ -25,14 +25,11 @@ def _clear_mcp_remote_tokens():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown hooks."""
-    # Per-session auth: clear all stored tokens so users must sign in fresh
     for provider in ("github", "notion", "figma", "hubspot"):
         mcp_manager.set_token(provider, None)
-    # Also clear mcp-remote's cached Zomato tokens
     _clear_mcp_remote_tokens()
     print("[BOOT] Session started — all OAuth tokens cleared (per-session auth)")
     yield
-    # On shutdown: clean up all MCP connections
     await mcp_manager.cleanup_all()
 
 
@@ -46,12 +43,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Routers ──────────────────────────────────────────────────────────────────
 app.include_router(auth.router, tags=["Auth"])
 app.include_router(chat.router, tags=["Chat"])
 
 
-# ── Core endpoints ───────────────────────────────────────────────────────────
 @app.get("/")
 async def root():
     return {"message": "Unified MCP Platform is running."}
@@ -62,7 +57,6 @@ async def health():
     return {"status": "ok"}
 
 
-# ── Server management ────────────────────────────────────────────────────────
 @app.get("/api/servers")
 async def list_servers():
     """Return status of all MCP servers."""
@@ -104,7 +98,6 @@ async def list_tools(server_id: str):
     }
 
 
-# ── Chat history ─────────────────────────────────────────────────────────────
 @app.get("/api/chats")
 async def list_chats():
     return storage.get_all_chats()

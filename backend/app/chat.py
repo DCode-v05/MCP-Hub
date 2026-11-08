@@ -13,15 +13,13 @@ from app import mcp_manager, storage, planner
 router = APIRouter()
 
 
-# ── Request / Response models ────────────────────────────────────────────────
 class ChatRequest(BaseModel):
     message: str
-    server: Optional[str] = None  # "github" | "zomato" | "notion" | "figma" (now optional for multi-server)
+    server: Optional[str] = None
     chatId: Optional[str] = None
     history: Optional[List[Dict[str, Any]]] = None
 
 
-# ── OpenAI client (lazy) ────────────────────────────────────────────────────
 _openai_client: OpenAI | None = None
 
 
@@ -34,7 +32,6 @@ def _get_openai():
     return _openai_client
 
 
-# ── Tool-name mapping (OpenAI tool name → server + actual MCP tool name) ─────
 TOOL_NAME_MAP: dict[str, dict[str, str]] = {}
 
 
@@ -58,7 +55,6 @@ def _clean_schema(schema: Any) -> Any:
         else:
             clean["type"] = val.lower() if isinstance(val, str) else "object"
 
-    # Array items
     schema_type = schema.get("type")
     is_array = schema_type == "array" or (isinstance(schema_type, list) and "array" in schema_type)
     if is_array and "items" in schema:
@@ -107,7 +103,6 @@ def _convert_mcp_tools_for_server(server_id: str, mcp_tools: list) -> list[dict]
         )
         schema = raw_schema or {"type": "object", "properties": {}}
 
-        # Remove problematic Notion properties
         if server_id == "notion" and "properties" in schema:
             schema["properties"].pop("icon", None)
             schema["properties"].pop("cover", None)
@@ -122,7 +117,6 @@ def _convert_mcp_tools_for_server(server_id: str, mcp_tools: list) -> list[dict]
         desc = tool.description if hasattr(tool, "description") else tool.get("description", "")
 
         base_safe_name = name.replace("-", "_").replace(".", "_")
-        # Namespaced tool name ensures uniqueness across servers
         safe_name = f"{server_id}_{base_safe_name}"
 
         TOOL_NAME_MAP[safe_name] = {
@@ -175,7 +169,6 @@ async def _build_unified_tools() -> Tuple[list[dict], list[str]]:
     return unified_tools, contributing_servers
 
 
-# ── System prompts per server / unified assistant ────────────────────────────
 SYSTEM_PROMPTS = {
     "github": (
         "You are a GitHub assistant integrated via MCP. "
@@ -247,23 +240,19 @@ def _extract_text(result: Any) -> str:
     return str(result)
 
 
-# ── Main chat endpoint ──────────────────────────────────────────────────────
 @router.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
     message = request.message
     history = request.history or []
     chat_id = request.chatId
-    server_hint = request.server  # Optional, used only as a soft preference hint
+    server_hint = request.server
 
     try:
-        # Build unified tool set across all connected servers
         openai_tools, contributing_servers = await _build_unified_tools()
 
-        # Build messages
         system_prompt = UNIFIED_SYSTEM_PROMPT
         messages = [{"role": "system", "content": system_prompt}]
 
-        # If a legacy client passed `server`, treat it as a soft routing hint
         if server_hint:
             hint = (
                 f"The user prefers tools from the '{server_hint}' server for this "
@@ -279,7 +268,6 @@ async def chat_endpoint(request: ChatRequest):
         last_content = None
         tool_calls_log: list[dict] = []
 
-        # Tool-calling loop (max 5 rounds)
         for _ in range(5):
             response = client.chat.completions.create(
                 model=settings.OPENAI_MODEL,
@@ -295,17 +283,14 @@ async def chat_endpoint(request: ChatRequest):
             if resp_msg.content:
                 last_content = resp_msg.content
 
-            # No tool calls → done
             if not resp_msg.tool_calls:
                 final_text = resp_msg.content
                 break
 
-            # Execute each tool call
             for tc in resp_msg.tool_calls:
                 safe_name = tc.function.name
                 mapping = TOOL_NAME_MAP.get(safe_name)
                 if not mapping:
-                    # Unknown tool mapping — skip but log
                     tool_calls_log.append({
                         "tool": safe_name,
                         "server": None,
@@ -340,7 +325,6 @@ async def chat_endpoint(request: ChatRequest):
                     "content": result_text,
                 })
 
-        # Fallback: if loop ended without a tool-free response
         if final_text is None:
             messages.append({
                 "role": "system",
@@ -361,7 +345,6 @@ async def chat_endpoint(request: ChatRequest):
                 or "Sorry, I couldn't generate a response."
             )
 
-        # Persist to chat history
         if chat_id:
             storage.add_message(chat_id, "user", message, "multi")
             storage.add_message(chat_id, "assistant", final_text, "multi", tool_calls_log or None)
@@ -378,7 +361,6 @@ async def chat_endpoint(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
 
 
-# ── Multi-server orchestration ──────────────────────────────────────────────
 async def _execute_plan(plan_steps: list[dict]) -> list[dict]:
     """
     Execute a plan by calling MCP tools on the appropriate servers.
@@ -447,17 +429,14 @@ async def _summarize_results(
     """
     formatted_results = _format_execution_results(execution_results)
     
-    # Build messages
     messages = [{"role": "system", "content": (
         "You are a helpful assistant that summarizes the results of multi-tool executions. "
         "Present the results clearly and concisely to the user, highlighting key information. "
         "Use markdown formatting for readability."
     )}]
     
-    # Add chat history
     messages.extend(_clean_history(history))
     
-    # Add user message and execution results
     messages.append({
         "role": "user",
         "content": (
@@ -491,7 +470,6 @@ async def chat_multi_endpoint(request: ChatRequest):
     chat_id = request.chatId
     
     try:
-        # Step 1: Create execution plan
         plan_result = await planner.plan_execution(message)
         
         if plan_result.get("error"):
@@ -513,13 +491,10 @@ async def chat_multi_endpoint(request: ChatRequest):
                 "toolCalls": [],
             }
         
-        # Step 2: Execute the plan
         execution_results = await _execute_plan(plan_steps)
         
-        # Step 3: Summarize results
         final_response = await _summarize_results(message, execution_results, history)
         
-        # Step 4: Persist to chat history
         if chat_id:
             storage.add_message(chat_id, "user", message, "multi", None)
             storage.add_message(

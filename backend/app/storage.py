@@ -10,7 +10,6 @@ SESSIONS_FILE = os.path.join(STORAGE_DIR, "sessions.json")
 CHATS_FILE = os.path.join(STORAGE_DIR, "chats.json")
 
 
-# ── Sessions (OAuth tokens for all providers) ───────────────────────────────
 def _load_sessions() -> dict:
     if not os.path.exists(SESSIONS_FILE):
         return {"sessions": {}}
@@ -27,7 +26,6 @@ def _save_sessions(data: dict):
         json.dump(data, f, indent=2)
 
 
-# -- Generic token helpers (provider = "notion", "github", "figma") ---------
 def save_token(provider: str, session_id: str, token: str):
     """Save an OAuth token for any provider."""
     data = _load_sessions()
@@ -46,16 +44,14 @@ def get_latest_token(provider: str) -> str | None:
     provider_sessions = {
         k: v for k, v in sessions.items()
         if v.get("provider") == provider or
-        (provider == "notion" and "notion_token" in v)  # backward compat
+        (provider == "notion" and "notion_token" in v)
     }
     if not provider_sessions:
         return None
     latest = max(provider_sessions.items(), key=lambda x: x[1].get("created_at", ""))
-    # support old format (notion_token) and new format (token)
     return latest[1].get("token") or latest[1].get("notion_token")
 
 
-# -- Backward-compatible Notion helpers -------------------------------------
 def save_notion_token(session_id: str, token: str):
     save_token("notion", session_id, token)
 
@@ -65,7 +61,6 @@ def get_notion_token(session_id: str) -> str | None:
     session = data.get("sessions", {}).get(f"notion_{session_id}")
     if session:
         return session.get("token")
-    # backward compat: old key format without provider prefix
     session = data.get("sessions", {}).get(session_id)
     return session.get("notion_token") if session else None
 
@@ -78,7 +73,6 @@ def has_notion_token(session_id: str) -> bool:
     return get_notion_token(session_id) is not None
 
 
-# ── Chat history ─────────────────────────────────────────────────────────────
 def _load_chats() -> dict:
     if not os.path.exists(CHATS_FILE):
         return {"chats": {}}
@@ -145,11 +139,9 @@ def add_message(chat_id: str, role: str, content: str, server: str = "", tool_ca
         msg["toolCalls"] = tool_calls
     chat["messages"].append(msg)
 
-    # Auto-update title from first user message
     if role == "user" and chat.get("title") == "New Chat":
         chat["title"] = content[:60] + ("…" if len(content) > 60 else "")
 
-    # Update server if not set
     if server and not chat.get("server"):
         chat["server"] = server
 

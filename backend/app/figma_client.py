@@ -41,8 +41,8 @@ class FigmaMCPClient:
             args=["-y", "figma-developer-mcp", "--stdio", "--env", "/dev/null"],
             env={
                 "FIGMA_OAUTH_TOKEN": self.token,
-                "NODE_ENV": "cli",     # forces stdio mode in figma-developer-mcp
-                "PORT": "",            # safety: override PORT=8000 from dotenv
+                "NODE_ENV": "cli",
+                "PORT": "",
             },
         )
 

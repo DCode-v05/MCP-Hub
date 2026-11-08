@@ -20,8 +20,6 @@ def main():
     url_file = sys.argv[1]
     args = sys.argv[2:]
 
-    # Spawn mcp-remote with stdin/stdout inherited (MCP protocol passthrough)
-    # and stderr piped so we can capture the OAuth URL.
     proc = subprocess.Popen(
         args,
         stdin=sys.stdin.fileno(),
@@ -35,7 +33,6 @@ def main():
         """Read mcp-remote stderr, capture OAuth URL, relay to parent stderr."""
         nonlocal url_found
         for raw_line in proc.stderr:
-            # Relay to our own stderr so fastmcp can still log it
             sys.stderr.buffer.write(raw_line)
             sys.stderr.buffer.flush()
 
@@ -43,10 +40,6 @@ def main():
                 continue
 
             text = raw_line.decode("utf-8", errors="replace")
-            # mcp-remote prints the OAuth URL on its own line, e.g.:
-            #   Please authorize this client by visiting:
-            #   https://mcp-server.zomato.com/authorize?...
-            # Match any line containing an https URL with "authorize" in it.
             match = re.search(r"(https?://\S*authorize\S*)", text)
             if match:
                 url_found = True

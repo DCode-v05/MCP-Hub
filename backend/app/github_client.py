@@ -23,7 +23,6 @@ class GitHubMCPClient:
         if self._tools_cache is not None:
             return self._tools_cache
 
-        # Fetch tools from the actual GitHub MCP server
         self._tools_cache = await self._fetch_tools_async()
         return self._tools_cache
     
@@ -46,7 +45,6 @@ class GitHubMCPClient:
                     return tools_response.tools
         except Exception as exc:
             print(f"Warning: Failed to fetch GitHub tools: {exc}")
-            # Return empty list if fetch fails
             return []
 
     async def call_tool_async(self, tool: str, arguments: dict[str, Any]) -> str:

@@ -9,7 +9,6 @@ from app.config import settings
 from app import mcp_manager
 
 
-# ── OpenAI client (lazy) ────────────────────────────────────────────────────
 _openai_client: OpenAI | None = None
 
 
@@ -46,7 +45,6 @@ async def get_available_servers_and_tools() -> Dict[str, List[Dict[str, str]]]:
 def _build_planner_prompt(servers_and_tools: Dict[str, List[Dict[str, str]]]) -> str:
     """Build the system prompt for the planner."""
 
-    # Build server descriptions
     server_descriptions = []
     for server_id, tools in servers_and_tools.items():
         meta = mcp_manager.SERVER_REGISTRY.get(server_id, {})
@@ -112,7 +110,6 @@ async def plan_execution(message: str) -> Dict[str, Any]:
     """
 
     try:
-        # Get available servers and tools
         servers_and_tools = await get_available_servers_and_tools()
 
         if not servers_and_tools:
@@ -121,11 +118,9 @@ async def plan_execution(message: str) -> Dict[str, Any]:
                 "error": "No servers are currently connected. Please connect at least one server first.",
             }
 
-        # Build planner prompt
         base_prompt = _build_planner_prompt(servers_and_tools)
         system_prompt = base_prompt
 
-        # Call OpenAI
         client = _get_openai()
         response = client.chat.completions.create(
             model=settings.OPENAI_MODEL,
@@ -133,13 +128,11 @@ async def plan_execution(message: str) -> Dict[str, Any]:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": message},
             ],
-            temperature=0.5,  # Lower temperature for more deterministic planning
+            temperature=0.5,
         )
 
         response_text = response.choices[0].message.content or ""
 
-        # Parse JSON from response
-        # Try to extract JSON if it's wrapped in markdown code blocks
         if "```json" in response_text:
             json_part = response_text.split("```json")[1].split("```")[0].strip()
         elif "```" in response_text:
@@ -149,28 +142,24 @@ async def plan_execution(message: str) -> Dict[str, Any]:
 
         plan = json.loads(json_part)
 
-        # Validate plan structure
         if not isinstance(plan, dict) or "steps" not in plan:
             return {"steps": [], "error": "Invalid plan structure returned by planner"}
 
         if not isinstance(plan["steps"], list):
             return {"steps": [], "error": "Plan steps must be a list"}
 
-        # Validate each step
         for step in plan["steps"]:
             if not isinstance(step, dict):
                 return {"steps": [], "error": "Each step must be a dictionary"}
             if "server" not in step or "tool" not in step:
                 return {"steps": [], "error": "Each step must have 'server' and 'tool' keys"}
 
-            # Verify server exists and is connected
             if step["server"] not in servers_and_tools:
                 return {
                     "steps": [],
                     "error": f"Server '{step['server']}' is not connected or has no tools",
                 }
 
-            # Verify tool exists on server
             available_tools = {t["name"] for t in servers_and_tools[step["server"]]}
             if step["tool"] not in available_tools:
                 return {

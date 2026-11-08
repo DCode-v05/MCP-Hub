@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { marked } from "marked";
 
-/* ─── Icon SVGs ──────────────────────────────────────────────────────────── */
 const Icons = {
   github: (
     <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
@@ -65,7 +64,6 @@ const SERVER_COLORS = {
 
 const API = "http://localhost:8000";
 
-/* ─── Markdown renderer ──────────────────────────────────────────────────── */
 marked.setOptions({ breaks: true, gfm: true });
 
 function renderMarkdown(text) {
@@ -73,7 +71,6 @@ function renderMarkdown(text) {
   return marked.parse(text);
 }
 
-/* ─── Main App ───────────────────────────────────────────────────────────── */
 export default function App() {
   const [servers, setServers] = useState({});
   const [messages, setMessages] = useState([]);
@@ -91,7 +88,6 @@ export default function App() {
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  /* ── Fetch servers ──────────────────────────────────────────────────────── */
   const fetchServers = useCallback(async () => {
     try {
       console.log(`[DEBUG] Fetching servers from ${API}/api/servers`);
@@ -130,7 +126,6 @@ export default function App() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Handle OAuth callback — user returned from provider auth page
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     for (const provider of ["github", "notion", "figma", "hubspot"]) {
@@ -142,10 +137,7 @@ export default function App() {
     }
   }, []);
 
-  /* ── Server connection ──────────────────────────────────────────────────── */
   const handleConnect = async (serverId) => {
-    // For Zomato: pre-open a popup immediately (within user-gesture context)
-    // so the browser doesn't block it when we set the URL later.
     let zomatoPopup = null;
     if (serverId === "zomato" && !servers[serverId]?.connected) {
       zomatoPopup = window.open("about:blank", "zomato-auth", "width=600,height=700");
@@ -156,19 +148,16 @@ export default function App() {
       const res = await fetch(`${API}/api/servers/${serverId}/connect`, { method: "POST" });
       const data = await res.json();
 
-      // Backend says we need OAuth — redirect to provider's auth page (same tab)
       if (data.needs_auth && data.auth_url) {
         if (zomatoPopup) zomatoPopup.close();
         window.location.href = `${API}${data.auth_url}`;
         return;
       }
 
-      // Zomato: navigate the pre-opened popup to the auth URL
       if (serverId === "zomato" && zomatoPopup) {
         if (data.auth_url) {
           zomatoPopup.location.href = data.auth_url;
         } else if (data.connecting) {
-          // URL wasn't ready yet — poll and redirect the popup when it arrives
           (async () => {
             for (let i = 0; i < 20; i++) {
               await new Promise((r) => setTimeout(r, 1000));
@@ -181,7 +170,6 @@ export default function App() {
                 }
               } catch {}
             }
-            // Timed out — close the empty popup
             zomatoPopup.close();
           })();
         } else {
@@ -206,7 +194,6 @@ export default function App() {
     }
   };
 
-  /* ── Chat management ────────────────────────────────────────────────────── */
   const handleNewChat = async () => {
     try {
       const res = await fetch(`${API}/api/chats/new`, { method: "POST" });
@@ -247,7 +234,6 @@ export default function App() {
     await fetchChats();
   };
 
-  /* ── Send message ───────────────────────────────────────────────────────── */
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
 
@@ -266,7 +252,7 @@ export default function App() {
         const chat = await res.json();
         chatId = chat.id;
         setActiveChatId(chatId);
-      } catch (e) { /* continue */ }
+      } catch (e) {  }
     }
 
     try {
@@ -306,7 +292,6 @@ export default function App() {
     await fetchChats();
   };
 
-  /* ── Input handling ─────────────────────────────────────────────────────── */
   const handleInputChange = (e) => {
     const val = e.target.value;
     setInput(val);
@@ -357,7 +342,6 @@ export default function App() {
     inputRef.current?.focus();
   };
 
-  /* ── Tools modal ─────────────────────────────────────────────────────── */
   const handleServerCardClick = (serverId) => {
     const srv = servers[serverId];
     if (!srv?.connected) return;
@@ -378,13 +362,11 @@ export default function App() {
 
   const closeToolsModal = () => setToolsModal({ open: false, serverId: null, serverName: "", tools: [], phase: "confirm" });
 
-  /* ── Render ─────────────────────────────────────────────────────────────── */
   const connectedCount = Object.values(servers).filter((s) => s.connected).length;
   const serverList = Object.entries(servers);
 
   return (
     <div className="app">
-      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside className={`sidebar ${sidebarOpen ? "open" : "closed"}`}>
         <div className="sidebar-header">
           <div className="logo">
@@ -475,7 +457,6 @@ export default function App() {
         </div>
       </aside>
 
-      {/* ── Main ────────────────────────────────────────────────────────── */}
       <main className="main">
         <header className="topbar">
           <button className="btn-icon sidebar-toggle" onClick={() => setSidebarOpen((p) => !p)}>
@@ -622,7 +603,6 @@ export default function App() {
           </div>
         </div>
       </main>
-      {/* ── Tools Modal ────────────────────────────────────────────── */}
       {toolsModal.open && (
         <div className="modal-overlay" onClick={closeToolsModal}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>

@@ -16,11 +16,9 @@ from app.github_client import GitHubMCPClient
 from app.figma_client import FigmaMCPClient
 from app.hubspot_client import HubSpotMCPClient
 
-# Background task handle for Zomato connection (so it isn't garbage collected)
 _zomato_connect_task: asyncio.Task | None = None
 
 
-# ── Server metadata ──────────────────────────────────────────────────────────
 SERVER_REGISTRY = {
     "github": {
         "name": "GitHub",
@@ -50,22 +48,17 @@ SERVER_REGISTRY = {
 }
 
 
-# ── Runtime state ────────────────────────────────────────────────────────────
 _clients: dict[str, Client] = {}
 _tools_cache: dict[str, list] = {}
 _connected: dict[str, bool] = {}
 _connecting: dict[str, bool] = {}
 
-# GitHub client (uses personal access token)
 _github_client: GitHubMCPClient | None = None
 
-# Figma client (uses OAuth token, direct stdio to avoid PORT conflicts)
 _figma_client: FigmaMCPClient | None = None
 
-# HubSpot client (uses OAuth token)
 _hubspot_client: HubSpotMCPClient | None = None
 
-# OAuth tokens (set after user signs in)
 _tokens: dict[str, str | None] = {
     "github": None,
     "notion": None,
@@ -73,7 +66,6 @@ _tokens: dict[str, str | None] = {
     "hubspot": None,
 }
 
-# Zomato OAuth URL capture (written by zomato_wrapper.py)
 _ZOMATO_URL_FILE = "/tmp/_unified_mcp_zomato_auth_url.txt"
 
 
@@ -106,7 +98,6 @@ def get_token(provider: str) -> str | None:
     return _tokens.get(provider)
 
 
-# Backward-compatible Notion helpers
 def set_notion_token(token: str):
     set_token("notion", token)
 
@@ -115,7 +106,6 @@ def get_notion_token() -> str | None:
     return get_token("notion")
 
 
-# ── Config builders ──────────────────────────────────────────────────────────
 def _build_config(server_id: str) -> dict:
     """Build fastmcp Client config for a given server."""
     if server_id == "notion":
@@ -142,7 +132,6 @@ def _build_config(server_id: str) -> dict:
     raise ValueError(f"Unknown server: {server_id}")
 
 
-# ── Connection management ────────────────────────────────────────────────────
 async def connect_server(server_id: str) -> dict[str, Any]:
     """Connect to an MCP server. Returns status dict."""
     global _github_client, _hubspot_client
@@ -157,10 +146,8 @@ async def connect_server(server_id: str) -> dict[str, Any]:
     if _connecting.get(server_id):
         return {"success": False, "connecting": True, "message": "Connection in progress…"}
 
-    # Pre-flight checks
     if server_id == "github":
         if settings.GITHUB_CLIENT_ID:
-            # OAuth mode — require OAuth token
             token = _tokens.get("github")
             if not token:
                 return {
@@ -169,7 +156,6 @@ async def connect_server(server_id: str) -> dict[str, Any]:
                     "auth_url": "/auth/github/login",
                 }
         else:
-            # PAT mode — use personal access token from .env
             token = settings.GITHUB_PERSONAL_ACCESS_TOKEN.strip()
             if not token:
                 return {"success": False, "error": "GITHUB_PERSONAL_ACCESS_TOKEN not set in .env"}
@@ -200,7 +186,6 @@ async def connect_server(server_id: str) -> dict[str, Any]:
             "auth_url": f"/auth/{server_id}/login",
         }
 
-    # Figma: use dedicated client (like GitHub) for full env control
     if server_id == "figma":
         _connecting[server_id] = True
         try:
@@ -252,18 +237,14 @@ async def connect_server(server_id: str) -> dict[str, Any]:
             print(f"[MCP] Failed to connect HubSpot: {exc}")
             return {"success": False, "error": str(exc)}
 
-    # Zomato uses mcp-remote which does its own browser-based OAuth.
-    # This blocks until the user authorises in their browser, so we
-    # run it in a background task and return immediately.
     if server_id == "zomato":
         global _zomato_connect_task
         _connecting[server_id] = True
         _clear_zomato_auth_url()
         _zomato_connect_task = asyncio.create_task(_connect_zomato_background())
 
-        # Wait briefly for the OAuth URL to be captured from mcp-remote stderr
         auth_url = None
-        for _ in range(8):  # 8 × 0.5 s = 4 s max
+        for _ in range(8):
             await asyncio.sleep(0.5)
             auth_url = get_zomato_auth_url()
             if auth_url:
@@ -319,13 +300,11 @@ def _cleanup_mcp_remote_lockfiles():
             pid = data.get("pid")
             if pid:
                 try:
-                    os.kill(pid, 0)  # probe — doesn't actually kill
+                    os.kill(pid, 0)
                 except OSError:
-                    # Process is dead → stale lockfile
                     os.remove(lock_path)
                     print(f"[Zomato] Removed stale lockfile (pid {pid}): {lock_path}")
                 else:
-                    # Process alive but from a previous server session → kill it
                     try:
                         os.kill(pid, signal.SIGTERM)
                         print(f"[Zomato] Killed orphaned mcp-remote (pid {pid})")
@@ -344,7 +323,6 @@ async def _connect_zomato_background():
     authorises.  Running this as a background task prevents the HTTP
     response from hanging.
     """
-    # Clean up orphaned mcp-remote processes / stale lockfiles first
     _cleanup_mcp_remote_lockfiles()
 
     try:
@@ -381,11 +359,9 @@ async def disconnect_server(server_id: str) -> dict[str, Any]:
     elif server_id == "hubspot":
         _hubspot_client = None
     elif server_id == "zomato":
-        # Cancel background connect task if still running
         if _zomato_connect_task and not _zomato_connect_task.done():
             _zomato_connect_task.cancel()
             _zomato_connect_task = None
-        # Kill any orphaned mcp-remote processes and remove lockfiles
         _cleanup_mcp_remote_lockfiles()
         if "zomato" in _clients:
             try:
@@ -479,7 +455,6 @@ def _is_ready(server_id: str) -> bool:
         return bool(settings.GITHUB_PERSONAL_ACCESS_TOKEN.strip())
     if server_id in ("notion", "figma", "hubspot"):
         return _tokens.get(server_id) is not None
-    # Zomato (oauth_browser) is always ready to attempt
     return True
 
 
@@ -505,7 +480,6 @@ async def cleanup_all():
         await disconnect_server(sid)
 
 
-# ── Unified tool registry -----------------------------------------------------
 async def get_all_connected_tools() -> list[dict[str, Any]]:
     """
     Return a flat list of all tools across all *connected* MCP servers.
