@@ -55,3 +55,6 @@ npm-debug.log*
 *.pkl
 *.pickle
 .cache/
+
+# Runtime chat history
+backend/chats.json
